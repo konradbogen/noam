@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Type 3 Grammar</title>
+
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        background: #ededee;
+      }
+
+      /* ---- DECK LAYOUT ---- */
+      .decks {
+        display: grid;
+        grid-template-columns: repeat(3, auto);
+        gap: 10px 20px;
+        justify-content: center;
+        margin: 10px auto;
+      }
+
+      .deck {
+        border: 1px solid #bbb;
+        padding: 5px;
+        width: 600px;
+        background: rgb(248, 248, 194);
+      }
+
+      .deck-title {
+        font-weight: bold;
+        font-size: 14px;
+        margin-bottom: 5px;
+      }
+
+      .open-cards {
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+      }
+
+      .open-cards img {
+        width: 60px;
+        cursor: pointer;
+      }
+
+      /* ---- PLAYERS ---- */
+      .players {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        margin: 15px;
+      }
+
+      .player {
+        border: 1px solid #aaa;
+        padding: 5px;
+        height: 260px;
+      }
+
+      .player-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      .play-area {
+        position: relative;
+        width: 100%;
+        height: 210px;
+        border: 1px dashed #ccc;
+        overflow: hidden;
+      }
+
+      .card {
+        width: 70px;
+        position: absolute;
+        cursor: grab;
+        user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- ===== DECKS ===== -->
+    <div class="decks">
+      <div class="deck">
+        <div class="deck-title">Punkte</div>
+        <div class="open-cards" id="openNormal"></div>
+      </div>
+
+      <div class="deck">
+        <div class="deck-title">Erweiterung</div>
+        <div class="open-cards" id="openSpecial"></div>
+      </div>
+      <div class="deck">
+        <div class="deck-title">Mittlere</div>
+        <div class="open-cards" id="openSpecialOther"></div>
+      </div>
+
+      <div class="deck">
+        <div class="deck-title">Late Game Punkte</div>
+        <div class="open-cards" id="openLate"></div>
+      </div>
+
+      <div class="deck">
+        <div class="deck-title">Wurzel</div>
+        <div class="open-cards" id="openRoot"></div>
+      </div>
+    </div>
+
+    <!-- ===== PLAYERS ===== -->
+    <div class="players" id="players"></div>
+
+    <script>
+      /* ---------- CONFIG ---------- */
+      let playerCount = parseInt(prompt("How many players? (1–4)"));
+      if (isNaN(playerCount) || playerCount < 1) playerCount = 1;
+      if (playerCount > 4) playerCount = 4;
+
+      const OPEN_COUNT = 4;
+
+      // Ask for player names
+      let playerNames = [];
+      for (let i = 0; i < playerCount; i++) {
+        let name =
+          prompt(`Enter name for Player ${i + 1}`) || `Player ${i + 1}`;
+        playerNames.push(name);
+      }
+
+      /* ---------- CARD GROUPS ---------- */
+      const rootCard = "sprite_00.png";
+      const fixedSpecial = ["sprite_07.png", "sprite_14.png"];
+      const otherSpecials = ["sprite_21.png", "sprite_31.png"];
+      const normalExceptions = [
+        "sprite_31.png",
+        "sprite_41.png",
+        "sprite_51.png",
+      ];
+
+      /* ---------- BUILD DECKS ---------- */
+      let rootDeck = Array(16).fill(rootCard);
+
+      let specialDeck = [];
+      let otherSpecialDeck = [];
+
+      fixedSpecial.forEach((c) => {
+        for (let i = 0; i < 4; i++) specialDeck.push(c);
+      });
+      otherSpecials.forEach((c) => {
+        for (let i = 0; i < 4; i++) otherSpecialDeck.push(c);
+      });
+      // Fisher–Yates shuffle
+      function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+
+      let lateDeck = [];
+      for (let i = 22; i <= 60; i++) {
+        const name = "sprite_" + String(i).padStart(2, "0") + ".png";
+        if (!normalExceptions.includes(name)) lateDeck.push(name);
+      }
+
+      let normalDeck = [];
+      for (let i = 1; i <= 60; i++) {
+        const name = "sprite_" + String(i).padStart(2, "0") + ".png";
+        if (
+          name !== rootCard &&
+          !fixedSpecial.includes(name) &&
+          !lateDeck.includes(name)
+        ) {
+          normalDeck.push(name);
+        }
+      }
+
+      shuffle(specialDeck);
+      shuffle(otherSpecialDeck);
+
+      shuffle(lateDeck);
+      shuffle(normalDeck);
+
+      /* ---------- STATE ---------- */
+      let openNormal = [];
+      let openSpecial = [];
+      let openMid = [];
+      let openLate = [];
+      let openRoot = [];
+      let players = Array.from({ length: playerCount }, () => []);
+
+      let activePlayer = 0; // Tracks whose turn it is
+
+      /* ---------- INIT ---------- */
+      for (let i = 0; i < OPEN_COUNT; i++) {
+        openNormal.push(draw(normalDeck));
+        openSpecial.push(draw(specialDeck));
+        openMid.push(draw(otherSpecialDeck));
+        openLate.push(draw(lateDeck));
+        openRoot.push(draw(rootDeck));
+      }
+
+      render();
+
+      /* ---------- UTIL ---------- */
+      function draw(deck) {
+        return deck.length ? deck.shift() : null;
+      }
+
+      /* ---------- GAME ACTION ---------- */
+      function takeCard(openArr, index) {
+        const card = openArr[index];
+        if (!card) return;
+        const rand = Math.floor(Math.random() * 100);
+        players[activePlayer].push({ name: card, x: 20 + rand, y: 20 + rand });
+        openArr[index] = draw(getDeckByOpen(openArr));
+        nextTurn();
+        render();
+      }
+
+      function getDeckByOpen(openArr) {
+        if (openArr === openNormal) return normalDeck;
+        if (openArr === openSpecial) return specialDeck;
+        if (openArr === openLate) return lateDeck;
+        if (openArr === openRoot) return rootDeck;
+        if (openArr === openMid) return otherSpecialDeck;
+      }
+
+      function nextTurn() {
+        activePlayer = (activePlayer + 1) % playerCount;
+      }
+
+      /* ---------- DRAG ---------- */
+      let dragged = null,
+        offsetX = 0,
+        offsetY = 0;
+
+      function startDrag(e, card) {
+        dragged = card;
+        offsetX = e.offsetX;
+        offsetY = e.offsetY;
+      }
+
+      function drag(e, area) {
+        if (!dragged) return;
+        const r = area.getBoundingClientRect();
+        dragged.x = e.clientX - r.left - offsetX;
+        dragged.y = e.clientY - r.top - offsetY;
+        render();
+      }
+
+      function stopDrag() {
+        dragged = null;
+      }
+
+      /* ---------- RENDER ---------- */
+      function render() {
+        renderOpen(openNormal, "openNormal");
+        renderOpen(openSpecial, "openSpecial");
+        renderOpen(openLate, "openLate");
+        renderOpen(openRoot, "openRoot");
+        renderOpen(openMid, "openSpecialOther");
+        renderPlayers();
+      }
+
+      function renderOpen(arr, id) {
+        const div = document.getElementById(id);
+        div.innerHTML = "";
+
+        arr.forEach((card, i) => {
+          if (!card) return;
+          const img = document.createElement("img");
+          img.src = "cards/" + card;
+          img.onclick = () => takeCard(arr, i);
+          div.appendChild(img);
+        });
+      }
+
+      function renderPlayers() {
+        const div = document.getElementById("players");
+        div.innerHTML = "";
+
+        players.forEach((hand, i) => {
+          const box = document.createElement("div");
+          box.className = "player";
+
+          // Highlight active player
+          box.style.border =
+            i === activePlayer ? "3px solid orange" : "1px solid #aaa";
+          box.style.background = i === activePlayer ? "#dbd2d2" : "white";
+
+          box.innerHTML = `<div class="player-title">${playerNames[i]}${
+            i === activePlayer ? " (your turn)" : ""
+          }</div>`;
+
+          const area = document.createElement("div");
+          area.className = "play-area";
+          area.onmousemove = (e) => drag(e, area);
+          area.onmouseup = stopDrag;
+          area.onmouseleave = stopDrag;
+
+          hand.forEach((card) => {
+            const img = document.createElement("img");
+            img.src = "cards/" + card.name;
+            img.className = "card";
+            img.style.left = card.x + "px";
+            img.style.top = card.y + "px";
+            img.onmousedown = (e) => startDrag(e, card);
+            area.appendChild(img);
+          });
+
+          box.appendChild(area);
+          div.appendChild(box);
+        });
+      }
+    </script>
+  </body>
+</html>
