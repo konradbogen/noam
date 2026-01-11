@@ -14,7 +14,7 @@
       /* ---- DECK LAYOUT ---- */
       .decks {
         display: grid;
-        grid-template-columns: repeat(3, auto);
+        grid-template-columns: repeat(2, auto);
         gap: 10px 20px;
         justify-content: center;
         margin: 10px auto;
@@ -91,10 +91,6 @@
         <div class="deck-title">Erweiterung</div>
         <div class="open-cards" id="openSpecial"></div>
       </div>
-      <div class="deck">
-        <div class="deck-title">Mittlere</div>
-        <div class="open-cards" id="openSpecialOther"></div>
-      </div>
 
       <div class="deck">
         <div class="deck-title">Late Game Punkte</div>
@@ -129,41 +125,45 @@
       /* ---------- CARD GROUPS ---------- */
       const rootCard = "sprite_00.png";
       const fixedSpecial = ["sprite_07.png", "sprite_14.png"];
-      const otherSpecials = ["sprite_21.png", "sprite_31.png"];
       const normalExceptions = [
         "sprite_31.png",
         "sprite_41.png",
         "sprite_51.png",
+        "sprite_21.png",
       ];
 
       /* ---------- BUILD DECKS ---------- */
       let rootDeck = Array(16).fill(rootCard);
 
       let specialDeck = [];
-      let otherSpecialDeck = [];
 
       fixedSpecial.forEach((c) => {
         for (let i = 0; i < 4; i++) specialDeck.push(c);
       });
-      otherSpecials.forEach((c) => {
-        for (let i = 0; i < 4; i++) otherSpecialDeck.push(c);
+      normalExceptions.forEach((c) => {
+        for (let i = 0; i < 4; i++) specialDeck.push(c);
       });
-      // Fisher–Yates shuffle
-      function shuffle(array) {
-        for (let i = array.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [array[i], array[j]] = [array[j], array[i]];
-        }
-      }
 
       let lateDeck = [];
       for (let i = 22; i <= 60; i++) {
         const name = "sprite_" + String(i).padStart(2, "0") + ".png";
         if (!normalExceptions.includes(name)) lateDeck.push(name);
       }
-
+      function shuffle(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+      shuffle(lateDeck);
       let normalDeck = [];
+
       for (let i = 1; i <= 60; i++) {
+        if (i == 4) {
+          normalDeck.push("sprite_61.png");
+          normalDeck.push("sprite_62.png");
+          normalDeck.push("sprite_63.png");
+        }
         const name = "sprite_" + String(i).padStart(2, "0") + ".png";
         if (
           name !== rootCard &&
@@ -174,16 +174,9 @@
         }
       }
 
-      shuffle(specialDeck);
-      shuffle(otherSpecialDeck);
-
-      shuffle(lateDeck);
-      shuffle(normalDeck);
-
       /* ---------- STATE ---------- */
       let openNormal = [];
       let openSpecial = [];
-      let openMid = [];
       let openLate = [];
       let openRoot = [];
       let players = Array.from({ length: playerCount }, () => []);
@@ -194,7 +187,6 @@
       for (let i = 0; i < OPEN_COUNT; i++) {
         openNormal.push(draw(normalDeck));
         openSpecial.push(draw(specialDeck));
-        openMid.push(draw(otherSpecialDeck));
         openLate.push(draw(lateDeck));
         openRoot.push(draw(rootDeck));
       }
@@ -222,7 +214,6 @@
         if (openArr === openSpecial) return specialDeck;
         if (openArr === openLate) return lateDeck;
         if (openArr === openRoot) return rootDeck;
-        if (openArr === openMid) return otherSpecialDeck;
       }
 
       function nextTurn() {
@@ -258,7 +249,6 @@
         renderOpen(openSpecial, "openSpecial");
         renderOpen(openLate, "openLate");
         renderOpen(openRoot, "openRoot");
-        renderOpen(openMid, "openSpecialOther");
         renderPlayers();
       }
 
